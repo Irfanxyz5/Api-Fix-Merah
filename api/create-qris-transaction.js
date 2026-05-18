@@ -13,10 +13,13 @@ export default async function handler(req, res) {
     const { duration, chatId, customApiKey } = req.body;
     if (!duration || !PRICE_LIST[duration]) return res.status(400).json({ error: 'Durasi tidak valid' });
 
+    // Validasi untuk paket permanen
     if (duration === 'permanent') {
       if (!customApiKey) return res.status(400).json({ error: 'Custom API Key required' });
       const keyRegex = /^[a-zA-Z0-9_-]{8,64}$/;
-      if (!keyRegex.test(customApiKey)) return res.status(400).json({ error: 'Format custom key tidak valid' });
+      if (!keyRegex.test(customApiKey)) {
+        return res.status(400).json({ error: 'Format custom key tidak valid (hanya huruf, angka, _, -, 8-64 karakter)' });
+      }
       const existing = await ApiKey.findOne({ key: customApiKey });
       if (existing) return res.status(409).json({ error: 'Custom API Key sudah digunakan' });
     }
@@ -24,6 +27,7 @@ export default async function handler(req, res) {
     const orderId = `QRIS-${uuidv4()}`;
     const amount = PRICE_LIST[duration];
 
+    // Simpan transaksi pending
     const transaction = new Transaction({
       orderId, chatId, amount, duration,
       customApiKey: duration === 'permanent' ? customApiKey : null,
@@ -31,35 +35,55 @@ export default async function handler(req, res) {
     });
     await transaction.save();
 
-    // Panggil Qiospay API (ganti endpoint sesuai dokumentasi Qiospay)
-    const qiosResponse = await fetch(`${process.env.QIOSPAY_API_BASE_URL}/qris/create`, {
+    // === PANGGIL API QIOSPAY REAL ===
+    const baseUrl = process.env.QIOSPAY_API_BASE_URL;
+    const merchantCode = process.env.QIOSPAY_MERCHANT_CODE;
+    const apiKey = process.env.QIOSPAY_API_KEY;
+
+    if (!baseUrl || !merchantCode || !apiKey) {
+      throw new Error('Missing Qiospay environment variables');
+    }
+
+    const qiosResponse = await fetch(`${baseUrl}/qris/create`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Merchant-Code': process.env.QIOSPAY_MERCHANT_CODE,
-        'X-API-Key': process.env.QIOSPAY_API_KEY
+        'X-Merchant-Code': merchantCode,
+        'X-API-Key': apiKey
       },
-      body: JSON.stringify({ order_id: orderId, amount, description: `Pembelian API Key ${duration}` })
+      body: JSON.stringify({
+        order_id: orderId,
+        amount: amount,
+        description: `Pembelian API Key ${duration}`
+      })
     });
 
     const qiosData = await qiosResponse.json();
-    if (!qiosData.qr_image_url) {
+
+    if (!qiosResponse.ok || !qiosData.qr_image_url) {
+      console.error('Qiospay error response:', qiosData);
       await Transaction.deleteOne({ orderId });
-      return res.status(500).json({ error: 'Gagal membuat QRIS, coba lagi' });
+      return res.status(502).json({
+        error: 'Gagal membuat QRIS dari payment gateway',
+        detail: qiosData.message || 'Coba lagi nanti'
+      });
     }
 
+    // Simpan URL QR Code dari Qiospay
     transaction.qrImageUrl = qiosData.qr_image_url;
     await transaction.save();
 
-    res.status(200).json({ success: true, qrImageUrl: qiosData.qr_image_url, orderId, amount });
+    // Kirim response ke bot
+    res.status(200).json({
+      success: true,
+      qrImageUrl: qiosData.qr_image_url,
+      orderId,
+      amount
+    });
   } catch (error) {
     console.error('create-qris error:', error);
-    // Tangani error koneksi database dengan pesan ramah
     if (error.name === 'MongooseServerSelectionError' || error.message?.includes('MongoDB')) {
-      return res.status(503).json({
-        error: 'Database sedang sibuk. Silakan coba lagi nanti.',
-        detail: 'Koneksi database terputus. Tim sedang memperbaiki.'
-      });
+      return res.status(503).json({ error: 'Database sedang sibuk. Silakan coba lagi.' });
     }
     res.status(500).json({ error: 'Internal server error', detail: error.message });
   }

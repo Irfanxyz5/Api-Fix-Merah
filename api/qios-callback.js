@@ -13,20 +13,29 @@ export default async function handler(req, res) {
     await connectDB();
 
     const { order_id, status, transaction_id } = req.body;
-    if (status !== 'success') return res.status(200).json({ message: 'Not success' });
+
+    // Hanya terima status success dari Qiospay (real payment)
+    if (status !== 'success') {
+      return res.status(200).json({ message: 'Not success' });
+    }
 
     const transaction = await Transaction.findOne({ orderId: order_id });
-    if (!transaction || transaction.status !== 'pending') return res.status(404).json({ error: 'Transaction not found' });
+    if (!transaction || transaction.status !== 'pending') {
+      return res.status(404).json({ error: 'Transaction not found or already processed' });
+    }
 
+    // Update transaksi
     transaction.status = 'paid';
     transaction.paidAt = new Date();
     transaction.qiosTransactionId = transaction_id;
     await transaction.save();
 
+    // Generate API Key
     let apiKey;
     if (transaction.duration === 'permanent' && transaction.customApiKey) {
       const existing = await ApiKey.findOne({ key: transaction.customApiKey });
       if (existing) {
+        // Jika bentrok (sangat jarang), fallback random
         apiKey = generateApiKey();
         await bot.telegram.sendMessage(transaction.chatId,
           `⚠️ Custom key ${transaction.customApiKey} sudah terpakai, kami buatkan random key:\n\`${apiKey}\``,
@@ -48,6 +57,7 @@ export default async function handler(req, res) {
     });
     await newKey.save();
 
+    // Kirim API Key ke user via Telegram
     await bot.telegram.sendMessage(transaction.chatId,
       `🎉 *Pembayaran Berhasil!*\n\n🔑 *API Key Anda:*\n\`${apiKey}\`\n\nSimpan baik-baik.`,
       { parse_mode: 'Markdown' }
