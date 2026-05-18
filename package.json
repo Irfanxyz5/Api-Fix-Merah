@@ -17,11 +17,8 @@
     "nodemailer": "^6.9.7",
     "telegraf": "^4.15.3",
     "uuid": "^9.0.0"
-<<<<<<< HEAD
-=======
   },
   "engines": {
   "node": "24.x"
->>>>>>> 92927bad2003cc93facbc73d1ef8dcbcb580cfc7
   }
 }
