@@ -31,7 +31,7 @@ export default async function handler(req, res) {
     });
     await transaction.save();
 
-    // Panggil Qiospay API (ganti dengan endpoint asli Qiospay)
+    // Panggil Qiospay API (ganti endpoint sesuai dokumentasi Qiospay)
     const qiosResponse = await fetch(`${process.env.QIOSPAY_API_BASE_URL}/qris/create`, {
       method: 'POST',
       headers: {
@@ -54,6 +54,13 @@ export default async function handler(req, res) {
     res.status(200).json({ success: true, qrImageUrl: qiosData.qr_image_url, orderId, amount });
   } catch (error) {
     console.error('create-qris error:', error);
+    // Tangani error koneksi database dengan pesan ramah
+    if (error.name === 'MongooseServerSelectionError' || error.message?.includes('MongoDB')) {
+      return res.status(503).json({
+        error: 'Database sedang sibuk. Silakan coba lagi nanti.',
+        detail: 'Koneksi database terputus. Tim sedang memperbaiki.'
+      });
+    }
     res.status(500).json({ error: 'Internal server error', detail: error.message });
   }
 }

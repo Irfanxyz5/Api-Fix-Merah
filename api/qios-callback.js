@@ -28,7 +28,7 @@ export default async function handler(req, res) {
       const existing = await ApiKey.findOne({ key: transaction.customApiKey });
       if (existing) {
         apiKey = generateApiKey();
-        await bot.telegram.sendMessage(transaction.chatId, 
+        await bot.telegram.sendMessage(transaction.chatId,
           `⚠️ Custom key ${transaction.customApiKey} sudah terpakai, kami buatkan random key:\n\`${apiKey}\``,
           { parse_mode: 'Markdown' }
         );
@@ -56,6 +56,9 @@ export default async function handler(req, res) {
     res.status(200).json({ success: true });
   } catch (error) {
     console.error('qios-callback error:', error);
+    if (error.name === 'MongooseServerSelectionError') {
+      return res.status(503).json({ error: 'Database error, pembayaran akan diproses ulang nanti.' });
+    }
     res.status(500).json({ error: 'Internal server error', detail: error.message });
   }
 }
