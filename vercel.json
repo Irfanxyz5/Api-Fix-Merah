@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "api/*.js", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/api/send-email", "dest": "/api/send-email.js" },
+    { "src": "/api/create-qris-transaction", "dest": "/api/create-qris-transaction.js" },
+    { "src": "/api/qios-callback", "dest": "/api/qios-callback.js" },
+    { "src": "/api/verify-apikey", "dest": "/api/verify-apikey.js" },
+    { "src": "/api/telegram-webhook", "dest": "/api/telegram-webhook.js" },
+    { "src": "/api/set-telegram-webhook", "dest": "/api/set-telegram-webhook.js" },
+    { "src": "/api/cleanup-expired-keys", "dest": "/api/cleanup-expired-keys.js" }
+  ]
+}
