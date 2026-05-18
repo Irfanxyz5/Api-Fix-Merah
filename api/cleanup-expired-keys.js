@@ -1,5 +1,5 @@
-import connectDB from '../utils/connectDB';
-import { ApiKey } from '../models/ApiKey';
+import connectDB from '../utils/connectDB.js';
+import { ApiKey } from '../models/ApiKey.js';
 
 export default async function handler(req, res) {
   try {

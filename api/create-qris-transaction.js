@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
-import connectDB from '../utils/connectDB';
-import { Transaction } from '../models/Transaction';
-import { ApiKey } from '../models/ApiKey';
+import connectDB from '../utils/connectDB.js';
+import { Transaction } from '../models/Transaction.js';
+import { ApiKey } from '../models/ApiKey.js';
 
 const PRICE_LIST = { '1h': 5000, '7h': 15000, '1month': 50000, 'permanent': 150000 };
 
@@ -31,7 +31,7 @@ export default async function handler(req, res) {
     });
     await transaction.save();
 
-    // Panggil Qiospay API (sesuaikan dengan endpoint asli)
+    // Panggil Qiospay API (ganti dengan endpoint asli Qiospay)
     const qiosResponse = await fetch(`${process.env.QIOSPAY_API_BASE_URL}/qris/create`, {
       method: 'POST',
       headers: {

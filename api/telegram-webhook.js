@@ -1,7 +1,6 @@
-// api/telegram-webhook.js
 import { Telegraf } from 'telegraf';
-import { PendingCustomKey } from '../models/PendingCustomKey';
-import connectDB from '../utils/connectDB';
+import { PendingCustomKey } from '../models/PendingCustomKey.js';
+import connectDB from '../utils/connectDB.js';
 
 const BASE_URL = process.env.BASE_URL;
 
@@ -11,18 +10,15 @@ export default async function handler(req, res) {
     return res.status(405).send('Method Not Allowed');
   }
 
-  // Validasi Token
   const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
   if (!BOT_TOKEN) {
-    console.error('FATAL: TELEGRAM_BOT_TOKEN environment variable is missing.');
+    console.error('FATAL: TELEGRAM_BOT_TOKEN missing');
     return res.status(500).json({ error: 'Server config error: Missing bot token.' });
   }
 
   try {
-    // Inisialisasi Bot dengan timeout 9 detik
     const bot = new Telegraf(BOT_TOKEN, { handlerTimeout: 9_000 });
 
-    // --- Command Handlers ---
     bot.start((ctx) => ctx.reply('Selamat datang! Gunakan /buy untuk membeli API key.'));
     bot.help((ctx) => ctx.reply('/buy - Beli API key\n/batal - Batalkan input custom key'));
 
@@ -89,7 +85,6 @@ export default async function handler(req, res) {
       }
     });
 
-    // Fungsi pembantu untuk proses pembelian
     async function processPurchase(ctx, duration, chatId, customKey = null) {
       await ctx.reply('⏳ Membuat QR Code...');
       const payload = { duration, chatId };
@@ -114,12 +109,9 @@ export default async function handler(req, res) {
       }
     }
 
-    // Proses update dari Telegram
     await bot.handleUpdate(req.body);
     return res.status(200).send('OK');
-
   } catch (error) {
-    // Tangkap semua error yang tidak terduga
     console.error('Unhandled error in webhook handler:', error);
     return res.status(500).json({ error: 'Internal Server Error', message: error.message });
   }

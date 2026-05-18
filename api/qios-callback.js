@@ -1,9 +1,9 @@
 import { Telegraf } from 'telegraf';
-import connectDB from '../utils/connectDB';
-import { Transaction } from '../models/Transaction';
-import { ApiKey } from '../models/ApiKey';
-import { generateApiKey } from '../utils/generateApiKey';
-import { calculateExpiry } from '../utils/calculateExpiry';
+import connectDB from '../utils/connectDB.js';
+import { Transaction } from '../models/Transaction.js';
+import { ApiKey } from '../models/ApiKey.js';
+import { generateApiKey } from '../utils/generateApiKey.js';
+import { calculateExpiry } from '../utils/calculateExpiry.js';
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
@@ -28,7 +28,10 @@ export default async function handler(req, res) {
       const existing = await ApiKey.findOne({ key: transaction.customApiKey });
       if (existing) {
         apiKey = generateApiKey();
-        await bot.telegram.sendMessage(transaction.chatId, `⚠️ Custom key ${transaction.customApiKey} sudah terpakai, kami buatkan random key: \`${apiKey}\``, { parse_mode: 'Markdown' });
+        await bot.telegram.sendMessage(transaction.chatId, 
+          `⚠️ Custom key ${transaction.customApiKey} sudah terpakai, kami buatkan random key:\n\`${apiKey}\``,
+          { parse_mode: 'Markdown' }
+        );
       } else {
         apiKey = transaction.customApiKey;
       }
