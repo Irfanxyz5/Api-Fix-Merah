@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     }
     res.status(200).json({ valid: true, role: 'user', email: keyData.email, duration: keyData.duration });
   } catch (error) {
-    console.error('verify-apikey error:', error);
+    console.error(error);
     res.status(500).json({ error: 'Internal server error', detail: error.message });
   }
 }

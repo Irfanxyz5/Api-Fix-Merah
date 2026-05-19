@@ -3,6 +3,11 @@ import { PendingCustomKey } from '../models/PendingCustomKey.js';
 import connectDB from '../utils/connectDB.js';
 
 const BASE_URL = process.env.BASE_URL;
+const ADMIN_CHAT_IDS = (process.env.ADMIN_CHAT_ID || '').split(',').map(id => id.trim());
+
+function isAdmin(chatId) {
+  return ADMIN_CHAT_IDS.includes(String(chatId));
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
@@ -13,8 +18,56 @@ export default async function handler(req, res) {
     const bot = new Telegraf(BOT_TOKEN, { handlerTimeout: 9_000 });
 
     bot.start(ctx => ctx.reply('Selamat datang! Gunakan /buy untuk membeli API key.'));
-    bot.help(ctx => ctx.reply('/buy - Beli API key\n/batal - Batalkan input custom key'));
+    bot.help(ctx => ctx.reply('/buy - Beli API key\n/batal - Batalkan input custom key\n\nAdmin commands:\n/addkey <key> <email> <duration>\n/delkey <key>\n/listkey'));
 
+    // Command untuk admin
+    bot.command('addkey', async (ctx) => {
+      if (!isAdmin(ctx.chat.id)) return ctx.reply('❌ Anda bukan admin.');
+      const args = ctx.message.text.split(' ').slice(1);
+      if (args.length < 3) return ctx.reply('Format: /addkey <key> <email> <duration> (1h,7h,1month,permanent)');
+      const [key, email, duration] = args;
+      const response = await fetch(`${BASE_URL}/api/admin?action=create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': process.env.ADMIN_API_KEY },
+        body: JSON.stringify({ key, email, duration })
+      });
+      const data = await response.json();
+      if (response.ok) ctx.reply(`✅ API Key ${key} berhasil ditambahkan.`);
+      else ctx.reply(`❌ Gagal: ${data.error}`);
+    });
+
+    bot.command('delkey', async (ctx) => {
+      if (!isAdmin(ctx.chat.id)) return ctx.reply('❌ Anda bukan admin.');
+      const args = ctx.message.text.split(' ').slice(1);
+      if (args.length < 1) return ctx.reply('Format: /delkey <key>');
+      const key = args[0];
+      const response = await fetch(`${BASE_URL}/api/admin?action=delete`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': process.env.ADMIN_API_KEY },
+        body: JSON.stringify({ key })
+      });
+      const data = await response.json();
+      if (response.ok) ctx.reply(`✅ API Key ${key} dihapus.`);
+      else ctx.reply(`❌ Gagal: ${data.error}`);
+    });
+
+    bot.command('listkey', async (ctx) => {
+      if (!isAdmin(ctx.chat.id)) return ctx.reply('❌ Anda bukan admin.');
+      const response = await fetch(`${BASE_URL}/api/admin?action=list`, {
+        headers: { 'x-admin-key': process.env.ADMIN_API_KEY }
+      });
+      const data = await response.json();
+      if (!data.success) return ctx.reply('Gagal mengambil data.');
+      if (data.keys.length === 0) return ctx.reply('Tidak ada API Key.');
+      let msg = '*Daftar API Key:*\n';
+      for (const k of data.keys.slice(0, 20)) {
+        msg += `\`${k.key}\` - ${k.duration} - ${k.isActive ? '✅ aktif' : '❌ nonaktif'}\n`;
+      }
+      if (data.keys.length > 20) msg += `\n... dan ${data.keys.length - 20} lainnya.`;
+      ctx.reply(msg, { parse_mode: 'Markdown' });
+    });
+
+    // Perintah /buy (sama seperti sebelumnya)
     bot.command('buy', async (ctx) => {
       const keyboard = {
         reply_markup: {
@@ -26,58 +79,40 @@ export default async function handler(req, res) {
           ]
         }
       };
-      await ctx.reply('Pilih durasi:', keyboard);
+      await ctx.reply('Pilih durasi API key:', keyboard);
     });
 
-    bot.action(/buy_(.+)/, async (ctx) => {
+    bot.action(/buy_(1h|7h|1month)/, async (ctx) => {
       const duration = ctx.match[1];
-      const chatId = ctx.chat.id;
-      if (duration === 'permanent') {
-        await connectDB();
-        await PendingCustomKey.findOneAndUpdate({ chatId }, { duration }, { upsert: true });
-        await ctx.reply('🔑 Kirimkan custom API Key (8-64 karakter, huruf/angka/_-). Ketik /batal.');
-        await ctx.answerCbQuery();
-        return;
-      }
-      // Tampilkan pilihan gateway
-      const gatewayKeyboard = {
+      const keyboard = {
         reply_markup: {
           inline_keyboard: [
-            [{ text: '💳 Bayar dengan QRIS (Qiospay)', callback_data: `gateway_qiospay_${duration}` }],
-            [{ text: '📱 Bayar dengan QRIS (Pakasir)', callback_data: `gateway_pakasir_${duration}` }]
+            [{ text: '💳 Qiospay', callback_data: `gateway_qiospay_${duration}` }],
+            [{ text: '📱 Pakasir', callback_data: `gateway_pakasir_${duration}` }]
           ]
         }
       };
-      await ctx.reply('Pilih metode pembayaran:', gatewayKeyboard);
+      await ctx.reply('Pilih metode pembayaran:', keyboard);
       await ctx.answerCbQuery();
     });
 
-    bot.action(/gateway_(qiospay|pakasir)_(.+)/, async (ctx) => {
+    bot.action('buy_permanent', async (ctx) => {
+      await connectDB();
+      await PendingCustomKey.findOneAndUpdate({ chatId: ctx.chat.id }, { duration: 'permanent' }, { upsert: true });
+      await ctx.reply('🔑 Kirimkan custom API Key (8-64 karakter, huruf/angka/_-). Ketik /batal untuk batal.');
+      await ctx.answerCbQuery();
+    });
+
+    bot.action(/gateway_(qiospay|pakasir)_(1h|7h|1month)/, async (ctx) => {
       const gateway = ctx.match[1];
       const duration = ctx.match[2];
-      const chatId = ctx.chat.id;
-      await ctx.reply(`⏳ Menyiapkan ${gateway === 'qiospay' ? 'Qiospay' : 'Pakasir'}...`);
-      const endpoint = gateway === 'qiospay' ? '/api/create-qiospay-transaction' : '/api/create-pakasir-transaction';
-      const response = await fetch(`${BASE_URL}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ duration, chatId })
-      });
-      const data = await response.json();
-      if (data.success) {
-        if (gateway === 'qiospay') {
-          await ctx.replyWithPhoto({ url: data.qrImageUrl }, {
-            caption: `💳 Total: Rp${data.amount.toLocaleString('id-ID')}\nScan QR statis dan bayar sesuai nominal. Setelah bayar, kami akan verifikasi otomatis.\n\nOrder ID: ${data.orderId}`
-          });
-        } else {
-          await ctx.replyWithPhoto({ source: Buffer.from(data.qrImageUrl.split(',')[1], 'base64') }, {
-            caption: `💳 Total: Rp${data.amount.toLocaleString('id-ID')}\nScan QR dinamis. Berlaku hingga ${new Date(data.expiredAt).toLocaleString()}`
-          });
-        }
-      } else {
-        await ctx.reply(`❌ Gagal: ${data.error}`);
-      }
-      await ctx.answerCbQuery();
+      await processPayment(ctx, gateway, duration, ctx.chat.id);
+    });
+
+    bot.action(/gateway_(qiospay|pakasir)_permanent_custom_(.+)/, async (ctx) => {
+      const gateway = ctx.match[1];
+      const customKey = ctx.match[2];
+      await processPayment(ctx, gateway, 'permanent', ctx.chat.id, customKey);
     });
 
     bot.on('text', async (ctx) => {
@@ -90,49 +125,45 @@ export default async function handler(req, res) {
       }
       await connectDB();
       const pending = await PendingCustomKey.findOne({ chatId });
-      if (!pending) return;
+      if (!pending || pending.duration !== 'permanent') return;
       await PendingCustomKey.deleteOne({ chatId });
-      // Untuk permanen, tanya gateway juga
-      const gatewayKeyboard = {
+      const keyboard = {
         reply_markup: {
           inline_keyboard: [
-            [{ text: '💳 Bayar dengan QRIS (Qiospay)', callback_data: `gateway_qiospay_${pending.duration}_custom_${text}` }],
-            [{ text: '📱 Bayar dengan QRIS (Pakasir)', callback_data: `gateway_pakasir_${pending.duration}_custom_${text}` }]
+            [{ text: '💳 Qiospay', callback_data: `gateway_qiospay_permanent_custom_${text}` }],
+            [{ text: '📱 Pakasir', callback_data: `gateway_pakasir_permanent_custom_${text}` }]
           ]
         }
       };
-      await ctx.reply('Pilih metode pembayaran untuk paket permanen:', gatewayKeyboard);
+      await ctx.reply('Pilih metode pembayaran untuk paket permanen:', keyboard);
     });
 
-    // Handler untuk custom permanent + gateway
-    bot.action(/gateway_(qiospay|pakasir)_(.+)_custom_(.+)/, async (ctx) => {
-      const gateway = ctx.match[1];
-      const duration = ctx.match[2];
-      const customKey = ctx.match[3];
-      const chatId = ctx.chat.id;
-      await ctx.reply(`⏳ Menyiapkan ${gateway} untuk key permanen...`);
-      const endpoint = gateway === 'qiospay' ? '/api/create-qiospay-transaction' : '/api/create-pakasir-transaction';
-      const response = await fetch(`${BASE_URL}${endpoint}`, {
+    async function processPayment(ctx, gateway, duration, chatId, customApiKey = null) {
+      await ctx.reply(`⏳ Menyiapkan pembayaran via ${gateway}...`);
+      const payload = { gateway, duration, chatId };
+      if (customApiKey) payload.customApiKey = customApiKey;
+      const response = await fetch(`${BASE_URL}/api/create-transaction`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ duration, chatId, customApiKey: customKey })
+        body: JSON.stringify(payload)
       });
       const data = await response.json();
       if (data.success) {
         if (gateway === 'qiospay') {
           await ctx.replyWithPhoto({ url: data.qrImageUrl }, {
-            caption: `💳 Total: Rp${data.amount.toLocaleString('id-ID')}\nScan QR statis dan bayar. Setelah bayar, API Key custom akan aktif.`
+            caption: `💳 Total: Rp${data.amount.toLocaleString('id-ID')}\nScan QR statis dan bayar sesuai nominal.`
           });
         } else {
-          await ctx.replyWithPhoto({ source: Buffer.from(data.qrImageUrl.split(',')[1], 'base64') }, {
-            caption: `💳 Total: Rp${data.amount.toLocaleString('id-ID')}\nQR dinamis berlaku hingga ${new Date(data.expiredAt).toLocaleString()}`
+          const buffer = Buffer.from(data.qrImageUrl.split(',')[1], 'base64');
+          await ctx.replyWithPhoto({ source: buffer }, {
+            caption: `💳 Total: Rp${data.amount.toLocaleString('id-ID')}\nQR berlaku hingga ${new Date(data.expiredAt).toLocaleString()}`
           });
         }
       } else {
         await ctx.reply(`❌ Gagal: ${data.error}`);
       }
       await ctx.answerCbQuery();
-    });
+    }
 
     await bot.handleUpdate(req.body);
     res.status(200).send('OK');

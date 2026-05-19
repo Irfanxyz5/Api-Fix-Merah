@@ -14,7 +14,7 @@ export default async function handler(req, res) {
 
     const { apiKey, to, subject, text, html, gmailUser, gmailAppPassword } = req.body;
     if (!apiKey) return res.status(401).json({ error: 'API Key required' });
-    if (!to || !subject || (!text && !html)) return res.status(400).json({ error: 'Missing required fields' });
+    if (!to || !subject || (!text && !html)) return res.status(400).json({ error: 'Missing fields' });
     if (!gmailUser || !gmailAppPassword) return res.status(400).json({ error: 'Gmail credentials required' });
 
     const cleanedPassword = gmailAppPassword.replace(/\s/g, '');
@@ -52,7 +52,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({ success: true, messageId: info.messageId });
   } catch (error) {
-    console.error('send-email error:', error);
+    console.error(error);
     res.status(500).json({ error: 'Internal server error', detail: error.message });
   }
 }

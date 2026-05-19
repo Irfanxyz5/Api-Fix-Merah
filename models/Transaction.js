@@ -9,16 +9,14 @@ const transactionSchema = new mongoose.Schema({
   status: { type: String, enum: ['pending', 'paid', 'expired'], default: 'pending' },
   qrImageUrl: { type: String },
   paymentGateway: { type: String, enum: ['qiospay', 'pakasir'], required: true },
-
-  // Qiospay fields
-  qiospayRefId: { type: String },      // refid dari callback
-  qiospayNmid: { type: String },       // nmid dari callback
-
-  // Pakasir fields
+  // Qiospay
+  qiospayRefId: { type: String },
+  qiospayNmid: { type: String },
+  // Pakasir
   pakasirPaymentNumber: { type: String },
   pakasirExpiredAt: { type: Date },
   pakasirTotalPayment: { type: Number },
-
+  paymentMethod: { type: String },
   createdAt: { type: Date, default: Date.now },
   paidAt: { type: Date }
 });

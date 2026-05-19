@@ -1,22 +1,14 @@
 {
   "version": 2,
-  "builds": [
-    { "src": "api/*.js", "use": "@vercel/node" },
-    { "src": "api/admin/*.js", "use": "@vercel/node" },
-    { "src": "api/admin/apikey/*.js", "use": "@vercel/node" }
-  ],
+  "builds": [{ "src": "api/*.js", "use": "@vercel/node" }],
   "routes": [
     { "src": "/api/send-email", "dest": "/api/send-email.js" },
     { "src": "/api/verify-apikey", "dest": "/api/verify-apikey.js" },
+    { "src": "/api/create-transaction", "dest": "/api/create-transaction.js" },
+    { "src": "/api/payment-webhook", "dest": "/api/payment-webhook.js" },
     { "src": "/api/telegram-webhook", "dest": "/api/telegram-webhook.js" },
     { "src": "/api/set-telegram-webhook", "dest": "/api/set-telegram-webhook.js" },
-    { "src": "/api/create-qiospay-transaction", "dest": "/api/create-qiospay-transaction.js" },
-    { "src": "/api/qiospay-webhook", "dest": "/api/qiospay-webhook.js" },
-    { "src": "/api/qiospay-mutasi", "dest": "/api/qiospay-mutasi.js" },
-    { "src": "/api/create-pakasir-transaction", "dest": "/api/create-pakasir-transaction.js" },
-    { "src": "/api/pakasir-webhook", "dest": "/api/pakasir-webhook.js" },
-    { "src": "/api/admin/apikey/create", "dest": "/api/admin/apikey/create.js" },
-    { "src": "/api/admin/apikey/delete", "dest": "/api/admin/apikey/delete.js" },
-    { "src": "/api/admin/apikey/list", "dest": "/api/admin/apikey/list.js" }
+    { "src": "/api/cleanup-expired-keys", "dest": "/api/cleanup-expired-keys.js" },
+    { "src": "/api/admin", "dest": "/api/admin.js" }
   ]
 }

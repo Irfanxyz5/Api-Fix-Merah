@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     const result = await ApiKey.deleteMany({ expiresAt: { $lt: new Date() }, isActive: false });
     res.status(200).json({ deleted: result.deletedCount });
   } catch (error) {
-    console.error('cleanup error:', error);
+    console.error(error);
     res.status(500).json({ error: error.message });
   }
 }
