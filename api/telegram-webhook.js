@@ -1,5 +1,6 @@
 import { Telegraf } from 'telegraf';
 import { PendingCustomKey } from '../models/PendingCustomKey.js';
+import { Transaction } from '../models/Transaction.js';
 import connectDB from '../utils/connectDB.js';
 
 const BASE_URL = process.env.BASE_URL;
@@ -24,10 +25,28 @@ export default async function handler(req, res) {
   try {
     const bot = new Telegraf(BOT_TOKEN, { handlerTimeout: 9_000 });
 
-    bot.start((ctx) => ctx.reply('Selamat datang! Gunakan /buy untuk membeli API key.'));
-    bot.help((ctx) => ctx.reply('/buy - Beli API key\n/batal - Batalkan input custom key\n\nAdmin commands:\n/addkey <key> <email> <duration>\n/delkey <key>\n/listkey'));
+    bot.start((ctx) => ctx.reply('Selamat datang! Gunakan /buy untuk membeli API key.\n\nGunakan /cancel untuk membatalkan transaksi yang sedang berlangsung.'));
+    bot.help((ctx) => ctx.reply(
+      '/buy - Beli API key\n' +
+      '/cancel - Batalkan transaksi pending terakhir\n' +
+      '/batal - Batalkan input custom key\n\n' +
+      'Admin commands:\n/addkey <key> <email> <duration>\n/delkey <key>\n/listkey'
+    ));
 
-    // === Admin commands ===
+    // ========== CANCEL TRANSACTION ==========
+    bot.command(['cancel', 'batalkan'], async (ctx) => {
+      const chatId = ctx.chat.id;
+      await connectDB();
+      const pendingTransaction = await Transaction.findOne({ chatId, status: 'pending' }).sort({ createdAt: -1 });
+      if (!pendingTransaction) {
+        return ctx.reply('❌ Tidak ada transaksi pending yang ditemukan.');
+      }
+      // Hapus transaksi dari database
+      await Transaction.deleteOne({ _id: pendingTransaction._id });
+      await ctx.reply(`✅ Transaksi dengan ID ${pendingTransaction.orderId} telah dibatalkan.`);
+    });
+
+    // ========== ADMIN COMMANDS ==========
     bot.command('addkey', async (ctx) => {
       if (!isAdmin(ctx.chat.id)) return ctx.reply('❌ Anda bukan admin.');
       const args = ctx.message.text.split(' ').slice(1);
@@ -86,7 +105,7 @@ export default async function handler(req, res) {
       }
     });
 
-    // === Perintah pembelian ===
+    // ========== PEMBELIAN ==========
     bot.command('buy', async (ctx) => {
       const keyboard = {
         reply_markup: {
@@ -169,14 +188,22 @@ export default async function handler(req, res) {
         });
         const data = await response.json();
         if (data.success) {
-          // QR image dalam format base64 data URL
           const base64Data = data.qrImageUrl.split(',')[1];
           const caption = gateway === 'qiospay'
             ? `💳 *Total: Rp${data.amount.toLocaleString('id-ID')}*\n\nScan QR Code di atas dan lakukan pembayaran sesuai nominal.\n\nSetelah bayar, sistem akan otomatis memverifikasi.\nOrder ID: \`${data.orderId}\``
             : `💳 *Total: Rp${data.amount.toLocaleString('id-ID')}*\n\nQR Code berlaku hingga ${new Date(data.expiredAt).toLocaleString()}\nOrder ID: \`${data.orderId}\``;
+          
+          // Tambahkan inline keyboard tombol batal
+          const cancelKeyboard = {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '❌ Batal', callback_data: `cancel_${data.orderId}` }]
+              ]
+            }
+          };
           await ctx.replyWithPhoto(
             { source: Buffer.from(base64Data, 'base64') },
-            { caption, parse_mode: 'Markdown' }
+            { caption, parse_mode: 'Markdown', ...cancelKeyboard }
           );
         } else {
           await ctx.reply(`❌ Gagal membuat transaksi: ${data.error || 'Coba lagi nanti'}`);
@@ -187,6 +214,22 @@ export default async function handler(req, res) {
       }
       await ctx.answerCbQuery();
     }
+
+    // ========== HANDLER CANCEL BUTTON ==========
+    bot.action(/cancel_(.+)/, async (ctx) => {
+      const orderId = ctx.match[1];
+      const chatId = ctx.chat.id;
+      await connectDB();
+      const transaction = await Transaction.findOne({ orderId, chatId, status: 'pending' });
+      if (!transaction) {
+        await ctx.reply('❌ Transaksi tidak ditemukan atau sudah diproses.');
+        await ctx.answerCbQuery();
+        return;
+      }
+      await Transaction.deleteOne({ _id: transaction._id });
+      await ctx.reply(`✅ Transaksi dengan ID ${orderId} telah dibatalkan.`);
+      await ctx.answerCbQuery();
+    });
 
     await bot.handleUpdate(req.body);
     return res.status(200).send('OK');
