@@ -6,6 +6,9 @@ import { ApiKey } from '../models/ApiKey.js';
 
 const PRICE_LIST = { '1h': 5000, '7h': 15000, '1month': 50000, 'permanent': 150000 };
 
+// QRIS string statis dari Qiospay (hardcode)
+const QIOSPAY_STATIC_QR_STRING = '00020101021126670016COM.NOBUBANK.WWW01189360050300000907180214047055912607190303UMI51440014ID.CO.QRIS.WWW0215ID20253745537460303UMI5204541153033605802ID5912PANZX MARKET6006BEKASI61051711162070703A0163048955';
+
 export default async function handler(req, res) {
   try {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -40,12 +43,14 @@ export default async function handler(req, res) {
     let responseData = { success: true, orderId, amount };
 
     if (gateway === 'qiospay') {
-      const staticQr = process.env.QIOSPAY_STATIC_QR_URL;
-      if (!staticQr) throw new Error('QIOSPAY_STATIC_QR_URL tidak diset');
-      transaction.qrImageUrl = staticQr;
+      // Generate QR code dari string statis yang sudah ditentukan
+      const qrBuffer = await QRCode.toBuffer(QIOSPAY_STATIC_QR_STRING);
+      const qrBase64 = `data:image/png;base64,${qrBuffer.toString('base64')}`;
+      transaction.qrImageUrl = qrBase64;
       await transaction.save();
-      responseData.qrImageUrl = staticQr;
-    } else if (gateway === 'pakasir') {
+      responseData.qrImageUrl = qrBase64;
+    } 
+    else if (gateway === 'pakasir') {
       const pakasirResponse = await fetch(`${process.env.PAKASIR_API_BASE_URL}/transactioncreate/qris`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -74,7 +79,7 @@ export default async function handler(req, res) {
 
     res.status(200).json(responseData);
   } catch (error) {
-    console.error(error);
+    console.error('Create transaction error:', error);
     res.status(500).json({ error: 'Internal server error', detail: error.message });
   }
 }
