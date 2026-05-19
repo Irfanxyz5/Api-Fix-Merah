@@ -8,6 +8,10 @@ import { calculateExpiry } from '../utils/calculateExpiry.js';
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
 export default async function handler(req, res) {
+  res.json = (data) => {
+    res.setHeader('Content-Type', 'application/json');
+    return res.send(JSON.stringify(data, null, 2));
+  };
   try {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
     await connectDB();

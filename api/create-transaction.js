@@ -10,6 +10,10 @@ const PRICE_LIST = { '1h': 5000, '7h': 15000, '1month': 50000, 'permanent': 1500
 const QIOSPAY_STATIC_QR_STRING = '00020101021126670016COM.NOBUBANK.WWW01189360050300000907180214047055912607190303UMI51440014ID.CO.QRIS.WWW0215ID20253745537460303UMI5204541153033605802ID5912PANZX MARKET6006BEKASI61051711162070703A0163048955';
 
 export default async function handler(req, res) {
+  res.json = (data) => {
+    res.setHeader('Content-Type', 'application/json');
+    return res.send(JSON.stringify(data, null, 2));
+  };
   try {
 if (req.method !== 'POST') {
   return res.status(405).json({

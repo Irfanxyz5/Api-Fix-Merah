@@ -8,6 +8,10 @@ const runMiddleware = (req, res, fn) => new Promise((resolve, reject) => {
 });
 
 export default async function handler(req, res) {
+  res.json = (data) => {
+    res.setHeader('Content-Type', 'application/json');
+    return res.send(JSON.stringify(data, null, 2));
+  };
   try {
     await runMiddleware(req, res, cors());
     if (req.method !== 'POST') {
