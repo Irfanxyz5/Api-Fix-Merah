@@ -10,7 +10,35 @@ const runMiddleware = (req, res, fn) => new Promise((resolve, reject) => {
 export default async function handler(req, res) {
   try {
     await runMiddleware(req, res, cors());
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+    if (req.method !== 'POST') {
+  return res.status(405).json({
+    status: 'error',
+    error: 'Method Not Allowed',
+    message: 'Hanya method POST yang diizinkan untuk endpoint ini.',
+    usage: {
+      endpoint: '/api/send-email',
+      method: 'POST',
+      description: 'Mengirim email menggunakan API Key dan akun Gmail pribadi pengirim. Wajib memiliki API Key yang valid (dibeli via bot atau admin).',
+      required_fields: ['apiKey', 'to', 'subject', 'gmailUser', 'gmailAppPassword'],
+      optional_fields: ['text', 'html (minimal salah satu)'],
+      example: {
+        curl: `curl -X POST ${process.env.BASE_URL}/api/send-email \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "apiKey": "YOUR_API_KEY",
+    "to": "tujuan@example.com",
+    "subject": "Test Email",
+    "text": "Halo dunia!",
+    "gmailUser": "emailkamu@gmail.com",
+    "gmailAppPassword": "abcd efgh ijkl mnop"
+  }'`,
+        response_success: { success: true, messageId: "<...>@gmail.com" },
+        response_error: { error: "Invalid or expired API Key" }
+      }
+    },
+    author: 'Ipanzxdev'
+  });
+}
 
     const { apiKey, to, subject, text, html, gmailUser, gmailAppPassword } = req.body;
     if (!apiKey) return res.status(401).json({ error: 'API Key required' });

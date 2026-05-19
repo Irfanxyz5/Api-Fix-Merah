@@ -11,10 +11,16 @@ function isAdmin(chatId) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
-    return res.status(405).send('Method Not Allowed');
-  }
+if (req.method !== 'POST') {
+  res.setHeader('Allow', 'POST');
+  return res.status(405).json({
+    status: 'error',
+    error: 'Method Not Allowed',
+    message: 'Webhook Telegram hanya menerima POST request.',
+    usage: 'Endpoint ini digunakan oleh Telegram untuk mengirim update. Jangan dipanggil manual. Untuk menguji bot, gunakan perintah di aplikasi Telegram.',
+    author: 'Ipanzxdev'
+  });
+}
 
   const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
   if (!BOT_TOKEN) {

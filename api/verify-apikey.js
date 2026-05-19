@@ -3,7 +3,26 @@ import { ApiKey } from '../models/ApiKey.js';
 
 export default async function handler(req, res) {
   try {
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+if (req.method !== 'POST') {
+  return res.status(405).json({
+    status: 'error',
+    error: 'Method Not Allowed',
+    message: 'Hanya method POST yang diizinkan.',
+    usage: {
+      endpoint: '/api/verify-apikey',
+      method: 'POST',
+      description: 'Memverifikasi validitas API Key (user atau admin).',
+      required_fields: ['apiKey'],
+      example: {
+        curl: `curl -X POST ${process.env.BASE_URL}/api/verify-apikey \\
+  -H "Content-Type: application/json" \\
+  -d '{"apiKey": "YOUR_API_KEY"}'`,
+        response: { valid: true, role: 'user', email: 'user@example.com', duration: '1month' }
+      }
+    },
+    author: 'Ipanzxdev'
+  });
+}
     const { apiKey } = req.body;
     if (!apiKey) return res.status(400).json({ error: 'API Key required' });
 

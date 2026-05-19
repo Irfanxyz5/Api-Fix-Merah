@@ -38,7 +38,15 @@ async function processPaidTransaction(transaction) {
 
 export default async function handler(req, res) {
   try {
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+if (req.method !== 'POST') {
+  return res.status(405).json({
+    status: 'error',
+    error: 'Method Not Allowed',
+    message: 'Webhook hanya menerima POST request.',
+    usage: 'Endpoint ini digunakan oleh Qiospay atau Pakasir untuk mengirim notifikasi pembayaran. Tidak untuk akses langsung.',
+    author: 'Ipanzxdev'
+  });
+}
     await connectDB();
 
     // Qiospay callback (menggunakan secret key di query)

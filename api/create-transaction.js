@@ -11,7 +11,27 @@ const QIOSPAY_STATIC_QR_STRING = '00020101021126670016COM.NOBUBANK.WWW0118936005
 
 export default async function handler(req, res) {
   try {
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+if (req.method !== 'POST') {
+  return res.status(405).json({
+    status: 'error',
+    error: 'Method Not Allowed',
+    message: 'Hanya method POST yang diizinkan.',
+    usage: {
+      endpoint: '/api/create-transaction',
+      method: 'POST',
+      description: 'Membuat transaksi pembayaran untuk pembelian API Key. Pilih gateway (qiospay atau pakasir), durasi, dan chatId. Untuk paket permanen, sertakan customApiKey.',
+      required_fields: ['gateway', 'duration', 'chatId'],
+      optional_fields: ['customApiKey (untuk permanen)'],
+      example: {
+        curl: `curl -X POST ${process.env.BASE_URL}/api/create-transaction \\
+  -H "Content-Type: application/json" \\
+  -d '{"gateway": "qiospay", "duration": "1h", "chatId": "123456789"}'`,
+        response: { success: true, qrImageUrl: "data:image/png;base64,...", orderId: "...", amount: 5000 }
+      }
+    },
+    author: 'Ipanzxdev'
+  });
+}
     await connectDB();
 
     const { gateway, duration, chatId, customApiKey } = req.body;
