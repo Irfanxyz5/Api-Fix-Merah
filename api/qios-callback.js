@@ -12,11 +12,15 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
     await connectDB();
 
-    const { order_id, status, transaction_id } = req.body;
+    const { order_id, status, transaction_id, amount } = req.body;
+
+    // Log callback for debugging
+    console.log('Qiospay Callback received:', req.body);
 
     // Hanya terima status success dari Qiospay (real payment)
-    if (status !== 'success') {
-      return res.status(200).json({ message: 'Not success' });
+    // Beberapa API mengirim 'success', 'Success', atau 'SUCCESS'
+    if (!status || status.toLowerCase() !== 'success') {
+      return res.status(200).json({ message: 'Transaction status not success', status });
     }
 
     const transaction = await Transaction.findOne({ orderId: order_id });
